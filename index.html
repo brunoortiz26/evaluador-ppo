@@ -3,43 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluador PPO - Sistema Profesional</title>
+    <title>Evaluador de PPO con IA</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Evaluador de Proyectos PPO</h1>
-            <p>Análisis técnico basado en normativa y antecedentes</p>
+            <h1>Evaluador de PPO con IA</h1>
+            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO) de los centros de Educación No Formal del GCABA.</p>
         </header>
 
-        <main>
-            <div class="card">
-                <div class="card-header">
-                    <span class="step-number">1</span>
-                    <h2>Proyecto Actual 2025</h2>
+        <div class="card">
+            <div class="card-header">
+                <h2>1. Cargar Documentos del PPO</h2>
+            </div>
+            <div class="upload-box">
+                <p>Click para subir o arrastrar y soltar</p>
+                <input type="file" id="archivoPrincipal" accept=".pdf,.doc,.docx">
+                <small>PDF o DOCX</small>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>2. Configuración de la Evaluación</h2>
+            </div>
+            
+            <div class="criterios">
+                <h3>Criterios de Evaluación</h3>
+                
+                <div class="criterio-item">
+                    <label>Claridad y Coherencia de Objetivos</label>
+                    <input type="range" min="1" max="10" value="8" id="criterio1">
+                    <span class="val">8</span>
                 </div>
-                <p>Seleccioná el archivo principal que querés auditar.</p>
-                <input type="file" id="archivoPrincipal" class="file-input" accept=".pdf,.doc,.docx">
-            </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <span class="step-number">2</span>
-                    <h2>Antecedentes / Proyectos Anteriores</h2>
+                <div class="criterio-item">
+                    <label>Viabilidad de las Actividades Propuestas</label>
+                    <input type="range" min="1" max="10" value="10" id="criterio2">
+                    <span class="val">10</span>
                 </div>
-                <p>Opcional: Subí el historial para comparar evolución.</p>
-                <input type="file" id="archivoAntecedentes" class="file-input" accept=".pdf,.doc,.docx">
+
+                <div class="criterio-item">
+                    <label>Adecuación al Marco Normativo</label>
+                    <input type="range" min="1" max="10" value="9" id="criterio3">
+                    <span class="val">9</span>
+                </div>
             </div>
 
-            <button id="btnGenerar" class="btn-primary">
-                <span>⚡</span> GENERAR REPORTE INSTITUCIONAL
-            </button>
-
-            <div id="resultado" class="resultado-box">
-                <p class="placeholder-text">El reporte aparecerá aquí después de procesar los archivos...</p>
+            <div class="antecedentes-area">
+                <h3>Documentos de Referencia Específicos (Opcional)</h3>
+                <div class="upload-box-mini">
+                    <p>Click para subir antecedentes</p>
+                    <input type="file" id="archivoAntecedentes" accept=".pdf,.doc,.docx">
+                </div>
             </div>
-        </main>
+        </div>
+
+        <button id="btnGenerar" class="btn-evaluar">Evaluar PPO</button>
+
+        <div id="resultado" class="resultado-box"></div>
     </div>
     <script src="script.js"></script>
 </body>
