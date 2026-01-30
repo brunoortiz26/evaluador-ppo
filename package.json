@@ -1,7 +1,16 @@
 {
+  "name": "proyecto-ppo",
+  "version": "1.0.0",
+  "description": "Asistente para Proyectos Pedagogicos Organizativos",
+  "main": "index.html",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "mammoth": "^1.11.0",
-    "pdf-parse": "^2.4.5"
+    "@google/generative-ai": "^0.1.0",
+    "mammoth": "^1.6.0",
+    "pdf-parse": "^1.1.1",
+    "fs": "0.0.1-security",
+    "path": "^0.12.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
