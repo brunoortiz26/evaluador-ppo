@@ -3,10 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluador PPO</title>
+    <title>Evaluador PPO - IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h1>¡Hola! El Evaluador PPO está en marcha</h1>
-    <p>Si estás viendo esto, significa que tu conexión entre GitHub, Netlify y tu computadora funciona perfecto.</p>
+<body class="bg-gray-100 min-h-screen p-5">
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold text-blue-600 mb-4 text-center">Evaluador PPO Pedagógico</h1>
+        <p class="text-gray-600 mb-4">Pega a continuación la planificación para que la IA la analice.</p>
+        
+        <textarea id="inputPPO" class="w-full h-40 p-3 border rounded mb-4" placeholder="Ej: Objetivos, contenidos y actividades..."></textarea>
+        
+        <button onclick="evaluarPPO()" id="btnEvaluar" class="w-full bg-blue-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-600 transition">
+            Analizar con IA
+        </button>
+        
+        <div id="resultado" class="mt-6 p-4 border-t hidden">
+            <h2 class="font-bold text-lg mb-2 text-gray-800">Resultado del Análisis:</h2>
+            <div id="textoResultado" class="text-gray-700 whitespace-pre-line leading-relaxed"></div>
+        </div>
+    </div>
+
+    <script>
+        async function evaluarPPO() {
+            const text = document.getElementById('inputPPO').value;
+            const btn = document.getElementById('btnEvaluar');
+            const resDiv = document.getElementById('resultado');
+            const resTexto = document.getElementById('textoResultado');
+
+            if(!text) return alert("Por favor, ingresa un texto para evaluar.");
+
+            btn.innerText = "⏳ Analizando planificación...";
+            btn.disabled = true;
+            resDiv.classList.add('hidden');
+
+            try {
+                // El endpoint '/.netlify/functions/gemini' es el que crearemos a continuación
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({ prompt: text })
+                });
+                
+                if (!response.ok) throw new Error("Error en la respuesta de la IA");
+                
+                const data = await response.json();
+                resTexto.innerText = data.reply;
+                resDiv.classList.remove('hidden');
+            } catch (err) {
+                resTexto.innerText = "⚠️ Error: Todavía no has configurado la 'Función de Netlify'. Avísame para decirte cómo hacerlo.";
+                resDiv.classList.remove('hidden');
+            } finally {
+                btn.innerText = "Analizar con IA";
+                btn.disabled = false;
+            }
+        }
+    </script>
 </body>
 </html>
