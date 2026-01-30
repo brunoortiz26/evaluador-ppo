@@ -3,58 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluador PPO - IA</title>
+    <title>Evaluador PPO - Documentos</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-5">
-    <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold text-blue-600 mb-4 text-center">Evaluador PPO Pedagógico</h1>
-        <p class="text-gray-600 mb-4">Pega a continuación la planificación para que la IA la analice.</p>
+<body class="bg-gray-100 min-h-screen p-5 text-gray-800">
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+        <h1 class="text-3xl font-extrabold text-blue-700 mb-2 text-center">Evaluador de PPO</h1>
+        <p class="text-center text-gray-500 mb-8">Sube tu planificación en PDF o Word para recibir feedback de la IA.</p>
         
-        <textarea id="inputPPO" class="w-full h-40 p-3 border rounded mb-4" placeholder="Ej: Objetivos, contenidos y actividades..."></textarea>
-        
-        <button onclick="evaluarPPO()" id="btnEvaluar" class="w-full bg-blue-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-600 transition">
-            Analizar con IA
-        </button>
-        
-        <div id="resultado" class="mt-6 p-4 border-t hidden">
-            <h2 class="font-bold text-lg mb-2 text-gray-800">Resultado del Análisis:</h2>
-            <div id="textoResultado" class="text-gray-700 whitespace-pre-line leading-relaxed"></div>
+        <div class="space-y-6">
+            <div class="flex items-center justify-center w-full">
+                <label class="flex flex-col w-full h-32 border-4 border-dashed border-blue-200 hover:bg-gray-50 hover:border-blue-300 transition-colors cursor-pointer">
+                    <div class="flex flex-col items-center justify-center pt-7">
+                        <p id="fileName" class="text-sm tracking-wider text-gray-400 font-bold text-center px-4">Selecciona tu archivo (.pdf o .docx)</p>
+                    </div>
+                    <input type="file" id="fileInput" class="opacity-0" accept=".pdf,.docx" onchange="updateName()" />
+                </label>
+            </div>
+
+            <button onclick="enviarDocumento()" id="btnAction" class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition duration-300">
+                Analizar Planificación
+            </button>
+        </div>
+
+        <div id="loading" class="hidden mt-8 text-center animate-pulse text-blue-600 font-medium">
+            La IA está leyendo y analizando tu documento...
+        </div>
+
+        <div id="result" class="hidden mt-8 p-6 bg-blue-50 rounded-lg border border-blue-100">
+            <h2 class="text-xl font-bold text-blue-800 mb-4 border-b border-blue-200 pb-2">Análisis Pedagógico:</h2>
+            <div id="responseText" class="text-gray-700 whitespace-pre-line leading-relaxed italic"></div>
         </div>
     </div>
 
     <script>
-        async function evaluarPPO() {
-            const text = document.getElementById('inputPPO').value;
-            const btn = document.getElementById('btnEvaluar');
-            const resDiv = document.getElementById('resultado');
-            const resTexto = document.getElementById('textoResultado');
+        function updateName() {
+            const input = document.getElementById('fileInput');
+            const nameLabel = document.getElementById('fileName');
+            nameLabel.innerText = input.files[0] ? "Archivo: " + input.files[0].name : "Selecciona tu archivo (.pdf o .docx)";
+        }
 
-            if(!text) return alert("Por favor, ingresa un texto para evaluar.");
+        async function enviarDocumento() {
+            const input = document.getElementById('fileInput');
+            const btn = document.getElementById('btnAction');
+            const resBox = document.getElementById('result');
+            const resText = document.getElementById('responseText');
+            const loading = document.getElementById('loading');
 
-            btn.innerText = "⏳ Analizando planificación...";
+            if (!input.files[0]) return alert("Por favor, selecciona un archivo primero.");
+
+            const file = input.files[0];
+            const reader = new FileReader();
+
             btn.disabled = true;
-            resDiv.classList.add('hidden');
+            loading.classList.remove('hidden');
+            resBox.classList.add('hidden');
 
-            try {
-                // El endpoint '/.netlify/functions/gemini' es el que crearemos a continuación
-                const response = await fetch('/.netlify/functions/gemini', {
-                    method: 'POST',
-                    body: JSON.stringify({ prompt: text })
-                });
+            reader.onload = async function() {
+                const base64Content = reader.result.split(',')[1];
                 
-                if (!response.ok) throw new Error("Error en la respuesta de la IA");
-                
-                const data = await response.json();
-                resTexto.innerText = data.reply;
-                resDiv.classList.remove('hidden');
-            } catch (err) {
-                resTexto.innerText = "⚠️ Error: Todavía no has configurado la 'Función de Netlify'. Avísame para decirte cómo hacerlo.";
-                resDiv.classList.remove('hidden');
-            } finally {
-                btn.innerText = "Analizar con IA";
-                btn.disabled = false;
-            }
+                try {
+                    const response = await fetch('/.netlify/functions/gemini', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            content: base64Content,
+                            type: file.type,
+                            name: file.name
+                        })
+                    });
+
+                    const data = await response.json();
+                    resText.innerText = data.reply || data.error;
+                    resBox.classList.remove('hidden');
+                } catch (e) {
+                    resText.innerText = "Error crítico al conectar con el servidor.";
+                    resBox.classList.remove('hidden');
+                } finally {
+                    btn.disabled = false;
+                    loading.classList.add('hidden');
+                }
+            };
+
+            reader.readAsDataURL(file);
         }
     </script>
 </body>
