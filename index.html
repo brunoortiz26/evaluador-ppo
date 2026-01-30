@@ -2,73 +2,58 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluador de PPO con IA</title>
+    <title>Evaluador de PPO</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Evaluador de PPO con IA</h1>
-            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO).</p>
-        </header>
-
+        <h1>Evaluador de PPO con IA</h1>
+        
         <div class="card">
-            <h2>1. Cargar Documentos del PPO</h2>
-            <input type="file" id="archivoPrincipal" accept=".pdf,.doc,.docx">
+            <h2>1. Cargar Documentos</h2>
+            <input type="file" id="archivoPrincipal">
         </div>
 
         <div class="card">
-            <h2>2. Configuración de la Evaluación</h2>
-            <div class="criterio-item">
-                <label>Claridad y Coherencia de Objetivos</label>
-                <input type="range" min="1" max="10" value="8" id="criterio1" oninput="this.nextElementSibling.innerText = this.value">
-                <span class="val">8</span>
-            </div>
-            <div class="criterio-item">
-                <label>Viabilidad de las Actividades Propuestas</label>
-                <input type="range" min="1" max="10" value="10" id="criterio2" oninput="this.nextElementSibling.innerText = this.value">
-                <span class="val">10</span>
-            </div>
-            <div class="criterio-item">
-                <label>Adecuación al Marco Normativo</label>
-                <input type="range" min="1" max="10" value="9" id="criterio3" oninput="this.nextElementSibling.innerText = this.value">
-                <span class="val">9</span>
-            </div>
-            <h3>Documentos de Referencia Específicos (Opcional)</h3>
-            <input type="file" id="archivoAntecedentes" accept=".pdf,.doc,.docx">
+            <h2>2. Configuración</h2>
+            <label>Claridad: <input type="range" id="c1" min="1" max="10" value="8" oninput="v1.innerText=this.value"> <span id="v1">8</span></label><br>
+            <label>Viabilidad: <input type="range" id="c2" min="1" max="10" value="10" oninput="v2.innerText=this.value"> <span id="v2">10</span></label><br>
+            <label>Normativa: <input type="range" id="c3" min="1" max="10" value="9" oninput="v3.innerText=this.value"> <span id="v3">9</span></label>
         </div>
 
-        <button id="btnEvaluar">Evaluar PPO</button>
-        <div id="resultado" class="resultado-box"></div>
+        <button id="btn">Evaluar PPO</button>
+        <div id="resultado" style="margin-top:20px; white-space: pre-wrap; border: 1px solid #ccc; padding: 10px;"></div>
     </div>
 
     <script>
-        document.getElementById('btnEvaluar').onclick = async () => {
+        document.getElementById('btn').onclick = async () => {
             const file = document.getElementById('archivoPrincipal').files[0];
-            const resDiv = document.getElementById('resultado');
-            if (!file) return alert("Cargá el PPO primero.");
+            if (!file) return alert("Subí un archivo");
+            
+            const res = document.getElementById('resultado');
+            res.innerText = "⏳ Conectando con Gemini... por favor esperá.";
 
-            resDiv.innerHTML = "⏳ Analizando con profundidad seleccionada...";
-
-            const formData = new FormData();
-            formData.append('archivo', file);
-            formData.append('c1', document.getElementById('criterio1').value);
-            formData.append('c2', document.getElementById('criterio2').value);
-            formData.append('c3', document.getElementById('criterio3').value);
-
-            try {
-                const response = await fetch('/.netlify/functions/gemini', { method: 'POST', body: formData });
-                const text = await response.text(); // Primero leemos como texto para evitar el error de JSON
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const base64 = reader.result.split(',')[1];
                 try {
-                    const data = JSON.parse(text);
-                    resDiv.innerHTML = data.mensaje || data.error;
+                    const response = await fetch('/.netlify/functions/gemini', {
+                        method: 'POST',
+                        body: JSON.stringify({ 
+                            file: base64, 
+                            name: file.name,
+                            p1: document.getElementById('c1').value,
+                            p2: document.getElementById('c2').value,
+                            p3: document.getElementById('c3').value
+                        })
+                    });
+                    const data = await response.json();
+                    res.innerText = data.mensaje || "Error: " + JSON.stringify(data);
                 } catch (e) {
-                    resDiv.innerHTML = "Error del motor: " + text;
+                    res.innerText = "Error de conexión. Revisá la consola.";
                 }
-            } catch (err) {
-                resDiv.innerHTML = "Error de conexión.";
-            }
+            };
         };
     </script>
 </body>
