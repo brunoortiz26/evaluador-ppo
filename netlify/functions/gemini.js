@@ -35,8 +35,10 @@ exports.handler = async (event) => {
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        
+        // CORRECCIÓN DEL 404: Usamos el nombre de modelo compatible con la API v1
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
+            model: "gemini-1.5-flash", 
             systemInstruction: "Eres un auditor experto de la Coordinación de Educación No Formal del GCABA. Tu función es evaluar PPOs actuales basándote en la normativa fija y comparándolos con años anteriores para asegurar la mejora continua."
         });
 
@@ -91,8 +93,9 @@ exports.handler = async (event) => {
         5. DEBILIDADES Y RECOMENDACIONES.
         `;
 
+        // Generamos el contenido
         const result = await model.generateContent(promptFinal);
-        const responseText = await result.response.text();
+        const responseText = result.response.text();
 
         return { 
             statusCode: 200, 
