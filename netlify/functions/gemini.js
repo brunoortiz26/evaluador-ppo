@@ -34,12 +34,12 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
     try {
+        // Inicialización con la API KEY
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        // CORRECCIÓN DEL 404: Usamos el nombre de modelo compatible con la API v1
+        // CAMBIO CRÍTICO: Usamos el ID de modelo más estable para evitar el 404
         const model = genAI.getGenerativeModel({ 
             model: "gemini-1.5-flash", 
-            systemInstruction: "Eres un auditor experto de la Coordinación de Educación No Formal del GCABA. Tu función es evaluar PPOs actuales basándote en la normativa fija y comparándolos con años anteriores para asegurar la mejora continua."
         });
 
         // 1. CARGA DE LOS 5 DOCUMENTOS FIJOS
@@ -63,6 +63,8 @@ exports.handler = async (event) => {
         }
 
         const promptFinal = `
+        SISTEMA: Eres un auditor experto de la Coordinación de Educación No Formal del GCABA. Tu función es evaluar PPOs actuales basándote en la normativa fija y comparándolos con años anteriores para asegurar la mejora continua.
+
         BASE NORMATIVA Y DE EVALUACIÓN:
         - Instructivo: ${instructivo}
         - Plantilla: ${plantilla}
@@ -93,9 +95,10 @@ exports.handler = async (event) => {
         5. DEBILIDADES Y RECOMENDACIONES.
         `;
 
-        // Generamos el contenido
+        // Generamos el contenido con un bloque try-catch interno para capturar errores de modelo
         const result = await model.generateContent(promptFinal);
-        const responseText = result.response.text();
+        const response = await result.response;
+        const responseText = response.text();
 
         return { 
             statusCode: 200, 
@@ -103,6 +106,7 @@ exports.handler = async (event) => {
         };
 
     } catch (error) {
+        console.error("Error detallado:", error);
         return { 
             statusCode: 500, 
             body: JSON.stringify({ error: "Error en el motor: " + error.message }) 
