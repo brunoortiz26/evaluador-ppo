@@ -18,7 +18,6 @@
                 <h2>1. Cargar Documentos del PPO</h2>
             </div>
             <div class="upload-box">
-                <p>Click para subir o arrastrar y soltar</p>
                 <input type="file" id="archivoPrincipal" accept=".pdf,.doc,.docx">
                 <small>PDF o DOCX</small>
             </div>
@@ -31,39 +30,63 @@
             
             <div class="criterios">
                 <h3>Criterios de Evaluación</h3>
-                
                 <div class="criterio-item">
                     <label>Claridad y Coherencia de Objetivos</label>
-                    <input type="range" min="1" max="10" value="8" id="criterio1">
+                    <input type="range" min="1" max="10" value="8" id="criterio1" oninput="this.nextElementSibling.innerText = this.value">
                     <span class="val">8</span>
                 </div>
-
                 <div class="criterio-item">
                     <label>Viabilidad de las Actividades Propuestas</label>
-                    <input type="range" min="1" max="10" value="10" id="criterio2">
+                    <input type="range" min="1" max="10" value="10" id="criterio2" oninput="this.nextElementSibling.innerText = this.value">
                     <span class="val">10</span>
                 </div>
-
                 <div class="criterio-item">
                     <label>Adecuación al Marco Normativo</label>
-                    <input type="range" min="1" max="10" value="9" id="criterio3">
+                    <input type="range" min="1" max="10" value="9" id="criterio3" oninput="this.nextElementSibling.innerText = this.value">
                     <span class="val">9</span>
                 </div>
             </div>
 
             <div class="antecedentes-area">
                 <h3>Documentos de Referencia Específicos (Opcional)</h3>
-                <div class="upload-box-mini">
-                    <p>Click para subir antecedentes</p>
-                    <input type="file" id="archivoAntecedentes" accept=".pdf,.doc,.docx">
-                </div>
+                <input type="file" id="archivoAntecedentes" accept=".pdf,.doc,.docx">
             </div>
         </div>
 
         <button id="btnGenerar" class="btn-evaluar">Evaluar PPO</button>
-
         <div id="resultado" class="resultado-box"></div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        // Este código conecta tus botones con el archivo gemini.js de Netlify
+        document.getElementById('btnGenerar').onclick = async () => {
+            const archivo = document.getElementById('archivoPrincipal').files[0];
+            const resDiv = document.getElementById('resultado');
+
+            if (!archivo) {
+                alert("Por favor, cargá el archivo del PPO.");
+                return;
+            }
+
+            resDiv.innerHTML = "⏳ Analizando PPO... por favor esperá.";
+
+            const formData = new FormData();
+            formData.append('archivo', archivo);
+            formData.append('criterio1', document.getElementById('criterio1').value);
+            formData.append('criterio2', document.getElementById('criterio2').value);
+            formData.append('criterio3', document.getElementById('criterio3').value);
+
+            try {
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                resDiv.innerHTML = data.mensaje || data.error || "Error desconocido";
+            } catch (err) {
+                resDiv.innerHTML = "Error: No se pudo conectar con el motor de IA.";
+            }
+        };
+    </script>
 </body>
 </html>
