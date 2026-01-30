@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!D<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -53,42 +53,63 @@
 
     <script>
         document.getElementById('btnEvaluar').onclick = async () => {
-            const file = document.getElementById('archivoPrincipal').files[0];
+            const fileInput = document.getElementById('archivoPrincipal');
+            const antInput = document.getElementById('archivoAntecedentes');
             const resDiv = document.getElementById('resultado');
-            if (!file) return alert("Subí el PPO primero.");
 
-            resDiv.innerHTML = "<p>⏳ Analizando con los criterios seleccionados... por favor esperá.</p>";
+            if (!fileInput.files[0]) return alert("Por favor, cargá el PPO principal.");
 
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const base64 = reader.result.split(',')[1];
-                try {
-                    const response = await fetch('/.netlify/functions/gemini', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            archivo: base64,
-                            nombre: file.name,
-                            c1: document.getElementById('criterio1').value,
-                            c2: document.getElementById('criterio2').value,
-                            c3: document.getElementById('criterio3').value
-                        })
-                    });
-                    
-                    const text = await response.text();
-                    try {
-                        const data = JSON.parse(text);
-                        resDiv.innerHTML = `<div class="reporte">${data.mensaje || data.error}</div>`;
-                    } catch (e) {
-                        resDiv.innerHTML = `<p style="color:red">Error del motor: ${text}</p>`;
-                    }
-                } catch (err) {
-                    resDiv.innerHTML = "<p>Error de conexión.</p>";
+            resDiv.innerHTML = "<p>⏳ Procesando documentos y generando reporte experto... por favor esperá.</p>";
+
+            // Función para convertir archivo a Base64
+            const toBase64 = file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+
+            try {
+                const file = fileInput.files[0];
+                const base64Principal = await toBase64(file);
+                
+                let base64Ant = null;
+                let nombreAnt = null;
+                if (antInput.files[0]) {
+                    base64Ant = await toBase64(antInput.files[0]);
+                    nombreAnt = antInput.files[0].name;
                 }
-            };
+
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        archivo: base64Principal,
+                        nombre: file.name,
+                        archivoAntBase64: base64Ant,
+                        nombreAnt: nombreAnt,
+                        c1: document.getElementById('criterio1').value,
+                        c2: document.getElementById('criterio2').value,
+                        c3: document.getElementById('criterio3').value
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.mensaje) {
+                    resDiv.innerHTML = `<div class="reporte">${data.mensaje}</div>`;
+                } else {
+                    resDiv.innerHTML = `<p style="color:red">Error: ${data.error || 'Respuesta inesperada'}</p>`;
+                }
+
+            } catch (err) {
+                resDiv.innerHTML = "<p style='color:red'>Error de conexión o procesamiento.</p>";
+                console.error(err);
+            }
         };
     </script>
+</body>
+</html>
 </body>
 </html>
 </body>

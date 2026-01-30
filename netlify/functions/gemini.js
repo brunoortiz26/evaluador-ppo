@@ -5,8 +5,8 @@ const fs = require("fs");
 const path = require("path");
 
 // Función universal para extraer texto (soporta PDF y Word)
-async function extraerTexto(buffer, mimetype, nombre) {
-    if (mimetype.includes("word") || nombre.endsWith(".docx")) {
+async function extraerTexto(buffer, nombre) {
+    if (nombre.toLowerCase().endsWith(".docx")) {
         const res = await mammoth.extractRawText({ buffer });
         return res.value;
     } else {
@@ -21,7 +21,7 @@ async function leerArchivoFijo(nombre) {
     if (!fs.existsSync(ruta)) return `(Archivo ${nombre} no encontrado en /data)`;
     
     const buffer = fs.readFileSync(ruta);
-    if (nombre.endsWith(".docx")) {
+    if (nombre.toLowerCase().endsWith(".docx")) {
         const res = await mammoth.extractRawText({ buffer });
         return res.value;
     } else {
@@ -31,6 +31,8 @@ async function leerArchivoFijo(nombre) {
 }
 
 exports.handler = async (event) => {
+    if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
+
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ 
@@ -42,22 +44,20 @@ exports.handler = async (event) => {
         const instructivo = await leerArchivoFijo("Instructivo Proyecto Organizativo.pdf");
         const plantilla = await leerArchivoFijo("Plantilla de PPO.pdf");
         const resoCriterios = await leerArchivoFijo("Proyecto Organizativo (extracto de la Reso de criterios curriculares).pdf");
-        const proyectoPedagogico = await leerArchivoFijo("PROYECTO PEDAGÓGICO ORGANIZATIVO.docx"); // Nombre corregido a .docx
+        const proyectoPedagogico = await leerArchivoFijo("PROYECTO PEDAGÓGICO ORGANIZATIVO.docx");
         const planillaEvaluacion = await leerArchivoFijo("Planilla modelo de evaluación.pdf");
 
+        // 2. RECIBIR DATOS DEL INDEX
         const body = JSON.parse(event.body);
         
-        // 2. PROCESAR PPO ACTUAL (Sección 1)
-        const ppoActualTexto = await extraerTexto(Buffer.from(body.ppoActual, 'base64'), body.tipoPpo, body.nombrePpo);
+        // Procesar PPO Actual
+        const ppoActualTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
 
-        // 3. PROCESAR ANTECEDENTES (Sección 2 - Opcional)
+        // Procesar Antecedentes (Opcional)
         let antecedentesTexto = "No se proporcionaron antecedentes.";
-        if (body.historial && body.historial.length > 0) {
-            antecedentesTexto = "";
-            for (let doc of body.historial) {
-                const txt = await extraerTexto(Buffer.from(doc.data, 'base64'), doc.tipo, doc.nombre);
-                antecedentesTexto += `\n--- ANTECEDENTE HISTÓRICO: ${doc.nombre} ---\n${txt}\n`;
-            }
+        if (body.archivoAntBase64) {
+            const txtAnt = await extraerTexto(Buffer.from(body.archivoAntBase64, 'base64'), body.nombreAnt);
+            antecedentesTexto = `--- ANTECEDENTE HISTÓRICO ENCONTRADO ---\n${txtAnt}`;
         }
 
         const promptFinal = `
@@ -68,26 +68,41 @@ exports.handler = async (event) => {
         - Marco PPO: ${proyectoPedagogico}
         - Criterios de Calificación: ${planillaEvaluacion}
 
+        CONFIGURACIÓN DE INTENSIDAD REQUERIDA POR EL USUARIO:
+        - Claridad y Coherencia: ${body.c1}/10
+        - Viabilidad: ${body.c2}/10
+        - Adecuación Normativa: ${body.c3}/10
+
         HISTORIAL Y MEJORAS PEDIDAS PREVIAMENTE:
         ${antecedentesTexto}
 
-        PROYECTO 2025 A EVALUAR:
+        PROYECTO ACTUAL A EVALUAR:
         ${ppoActualTexto}
 
         TAREA: 
-        Realiza una auditoría profunda. Si hay antecedentes, verifica punto por punto si el centro corrigió lo que se le observó en años anteriores.
+        Realiza una auditoría profunda. Usa los niveles de intensidad solicitados para ser más o menos estricto en cada apartado. 
+        Si hay antecedentes, verifica punto por punto si el centro corrigió lo que se le observó.
 
         FORMATO DE INFORME:
         1. PUNTAJE FINAL (0-100) según la Planilla de Evaluación.
         2. RESUMEN EJECUTIVO.
-        3. ANÁLISIS DE MEJORA CONTINUA: (Comparar específicamente si el centro aplicó las mejoras sugeridas en los antecedentes).
+        3. ANÁLISIS DE MEJORA CONTINUA.
         4. FORTALEZAS.
-        5. DEBILIDADES Y RECOMENDACIONES (Si repiten errores pasados, destacarlo como grave).
+        5. DEBILIDADES Y RECOMENDACIONES.
         `;
 
         const result = await model.generateContent(promptFinal);
-        return { statusCode: 200, body: JSON.stringify({ reply: result.response.text() }) };
+        const responseText = await result.response.text();
+
+        return { 
+            statusCode: 200, 
+            body: JSON.stringify({ mensaje: responseText }) 
+        };
+
     } catch (error) {
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ error: "Error en el motor: " + error.message }) 
+        };
     }
 };
