@@ -10,81 +10,64 @@
     <div class="container">
         <header>
             <h1>Evaluador de PPO con IA</h1>
-            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO) de los centros de Educación No Formal del GCABA.</p>
+            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO).</p>
         </header>
 
         <div class="card">
-            <div class="card-header">
-                <h2>1. Cargar Documentos del PPO</h2>
-            </div>
-            <div class="upload-box">
-                <input type="file" id="archivoPrincipal" accept=".pdf,.doc,.docx">
-                <small>PDF o DOCX</small>
-            </div>
+            <h2>1. Cargar Documentos del PPO</h2>
+            <input type="file" id="archivoPrincipal" accept=".pdf,.doc,.docx">
         </div>
 
         <div class="card">
-            <div class="card-header">
-                <h2>2. Configuración de la Evaluación</h2>
+            <h2>2. Configuración de la Evaluación</h2>
+            <div class="criterio-item">
+                <label>Claridad y Coherencia de Objetivos</label>
+                <input type="range" min="1" max="10" value="8" id="criterio1" oninput="this.nextElementSibling.innerText = this.value">
+                <span class="val">8</span>
             </div>
-            
-            <div class="criterios">
-                <h3>Criterios de Evaluación</h3>
-                <div class="criterio-item">
-                    <label>Claridad y Coherencia de Objetivos</label>
-                    <input type="range" min="1" max="10" value="8" id="criterio1" oninput="this.nextElementSibling.innerText = this.value">
-                    <span class="val">8</span>
-                </div>
-                <div class="criterio-item">
-                    <label>Viabilidad de las Actividades Propuestas</label>
-                    <input type="range" min="1" max="10" value="10" id="criterio2" oninput="this.nextElementSibling.innerText = this.value">
-                    <span class="val">10</span>
-                </div>
-                <div class="criterio-item">
-                    <label>Adecuación al Marco Normativo</label>
-                    <input type="range" min="1" max="10" value="9" id="criterio3" oninput="this.nextElementSibling.innerText = this.value">
-                    <span class="val">9</span>
-                </div>
+            <div class="criterio-item">
+                <label>Viabilidad de las Actividades Propuestas</label>
+                <input type="range" min="1" max="10" value="10" id="criterio2" oninput="this.nextElementSibling.innerText = this.value">
+                <span class="val">10</span>
             </div>
-
-            <div class="antecedentes-area">
-                <h3>Documentos de Referencia Específicos (Opcional)</h3>
-                <input type="file" id="archivoAntecedentes" accept=".pdf,.doc,.docx">
+            <div class="criterio-item">
+                <label>Adecuación al Marco Normativo</label>
+                <input type="range" min="1" max="10" value="9" id="criterio3" oninput="this.nextElementSibling.innerText = this.value">
+                <span class="val">9</span>
             </div>
+            <h3>Documentos de Referencia Específicos (Opcional)</h3>
+            <input type="file" id="archivoAntecedentes" accept=".pdf,.doc,.docx">
         </div>
 
-        <button id="btnGenerar" class="btn-evaluar">Evaluar PPO</button>
+        <button id="btnEvaluar">Evaluar PPO</button>
         <div id="resultado" class="resultado-box"></div>
     </div>
 
     <script>
-        // Este código conecta tus botones con el archivo gemini.js de Netlify
-        document.getElementById('btnGenerar').onclick = async () => {
-            const archivo = document.getElementById('archivoPrincipal').files[0];
+        document.getElementById('btnEvaluar').onclick = async () => {
+            const file = document.getElementById('archivoPrincipal').files[0];
             const resDiv = document.getElementById('resultado');
+            if (!file) return alert("Cargá el PPO primero.");
 
-            if (!archivo) {
-                alert("Por favor, cargá el archivo del PPO.");
-                return;
-            }
-
-            resDiv.innerHTML = "⏳ Analizando PPO... por favor esperá.";
+            resDiv.innerHTML = "⏳ Analizando con profundidad seleccionada...";
 
             const formData = new FormData();
-            formData.append('archivo', archivo);
-            formData.append('criterio1', document.getElementById('criterio1').value);
-            formData.append('criterio2', document.getElementById('criterio2').value);
-            formData.append('criterio3', document.getElementById('criterio3').value);
+            formData.append('archivo', file);
+            formData.append('c1', document.getElementById('criterio1').value);
+            formData.append('c2', document.getElementById('criterio2').value);
+            formData.append('c3', document.getElementById('criterio3').value);
 
             try {
-                const response = await fetch('/.netlify/functions/gemini', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                resDiv.innerHTML = data.mensaje || data.error || "Error desconocido";
+                const response = await fetch('/.netlify/functions/gemini', { method: 'POST', body: formData });
+                const text = await response.text(); // Primero leemos como texto para evitar el error de JSON
+                try {
+                    const data = JSON.parse(text);
+                    resDiv.innerHTML = data.mensaje || data.error;
+                } catch (e) {
+                    resDiv.innerHTML = "Error del motor: " + text;
+                }
             } catch (err) {
-                resDiv.innerHTML = "Error: No se pudo conectar con el motor de IA.";
+                resDiv.innerHTML = "Error de conexión.";
             }
         };
     </script>
