@@ -4,109 +4,110 @@ const pdfParse = require("pdf-parse");
 const fs = require("fs");
 const path = require("path");
 
-// Función universal para extraer texto (PDF, Word, RTF/Texto)
-async function extraerTexto(buffer, nombre) {
-    const ext = nombre.toLowerCase();
+// Configuración del modelo
+const MODEL_NAME = "gemini-1.5-flash";
+
+async function extraerTexto(buffer, nombreArchivo) {
+    const extension = nombreArchivo.split('.').pop().toLowerCase();
     try {
-        if (ext.endsWith(".docx")) {
-            const res = await mammoth.extractRawText({ buffer });
-            return res.value;
-        } else if (ext.endsWith(".pdf")) {
+        if (extension === "docx") {
+            const result = await mammoth.extractRawText({ buffer });
+            return result.value;
+        } else if (extension === "pdf") {
             const data = await pdfParse(buffer);
             return data.text;
-        } else {
-            // Manejo para el archivo .rtf o texto plano
-            return buffer.toString('utf8').replace(/\\f[0-9x]|\\fs[0-9x]|\\f[0-9x]|\\par|\\tab/g, ""); 
+        } else if (extension === "rtf") {
+            const textoRtf = buffer.toString('utf8');
+            // Limpieza básica de etiquetas RTF
+            return textoRtf.replace(/\\f[0-9x]|\\fs[0-9x]|\\f[0-9x]|\\par|\\tab|\\ldblquote|\\rdblquote|\\'e1|\\'e9|\\'ed|\\'f3|\\'fa|\\'f1|\\u[0-9]{4,5}\??/g, " ");
         }
-    } catch (e) {
-        return `Error leyendo ${nombre}: ${e.message}`;
+        return buffer.toString('utf8');
+    } catch (error) {
+        console.error(`Error extrayendo texto de ${nombreArchivo}:`, error);
+        return "";
     }
 }
 
-// Función para leer los archivos de la carpeta /data (Ajustado para Vercel)
 async function leerArchivoFijo(nombre) {
-    // process.cwd() es la raíz en Vercel, permitiendo llegar a /data
-    const ruta = path.join(process.cwd(), "data", nombre);
-    if (!fs.existsSync(ruta)) return `(Archivo ${nombre} no encontrado)`;
-    
-    const buffer = fs.readFileSync(ruta);
-    return await extraerTexto(buffer, nombre);
+    try {
+        // Buscamos en la carpeta 'data' en la raíz del proyecto
+        const ruta = path.join(process.cwd(), "data", nombre);
+        if (!fs.existsSync(ruta)) {
+            console.error(`Archivo no encontrado: ${ruta}`);
+            return "";
+        }
+        const buffer = fs.readFileSync(ruta);
+        return await extraerTexto(buffer, nombre);
+    } catch (error) {
+        console.error(`Error al leer archivo fijo ${nombre}:`, error);
+        return "";
+    }
 }
 
 exports.handler = async (event) => {
-    // Compatibilidad de métodos Vercel (POST)
+    // Vercel maneja los métodos en event.method o event.httpMethod
     const method = event.httpMethod || event.method;
-    if (method !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
+    if (method !== "POST") {
+        return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
+    }
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-        // 1. CARGA DE LOS 5 DOCUMENTOS FIJOS (Nombres exactos según tu VS Code)
-        const instructivo = await leerArchivoFijo("Instructivo Proyecto Organizativo (extracto de la Reso de criterios curriculares).docx");
-        const planillaEvaluacion = await leerArchivoFijo("Planilla modelo de evaluación.pdf");
-        const plantilla = await leerArchivoFijo("Plantilla de PPO.docx");
-        const resoCriterios = await leerArchivoFijo("Proyecto Organizativo (extracto de la Reso de criterios curriculares).docx");
-        const proyectoPedagogico = await leerArchivoFijo("PROYECTO PEDAGÓGICO ORGANIZATIVO.rtf");
+        // Carga de documentos de referencia (Nombres simplificados)
+        const [inst, plani, planti, reso, proy] = await Promise.all([
+            leerArchivoFijo("instructivo.docx"),
+            leerArchivoFijo("planilla.pdf"),
+            leerArchivoFijo("plantilla.docx"),
+            leerArchivoFijo("resolucion.docx"),
+            leerArchivoFijo("proyecto.rtf")
+        ]);
 
-        // 2. RECIBIR DATOS DEL INDEX
         const body = JSON.parse(event.body);
-        
-        // Procesar PPO Actual
-        const ppoActualTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
-
-        // Procesar Antecedentes (Opcional)
-        let antecedentesTexto = "No se proporcionaron antecedentes.";
-        if (body.archivoAntBase64) {
-            const txtAnt = await extraerTexto(Buffer.from(body.archivoAntBase64, 'base64'), body.nombreAnt);
-            antecedentesTexto = `--- ANTECEDENTE HISTÓRICO ENCONTRADO ---\n${txtAnt}`;
+        if (!body.archivo) {
+            return { statusCode: 400, body: JSON.stringify({ error: "Falta el archivo PPO" }) };
         }
 
-        const promptFinal = `
-        SISTEMA: Eres un auditor experto de la Coordinación de Educación No Formal del GCABA. Tu función es evaluar PPOs actuales basándote en la normativa fija y comparándolos con años anteriores para asegurar la mejora continua.
+        const ppoUsuarioTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
 
-        BASE NORMATIVA Y DE EVALUACIÓN:
-        - Instructivo: ${instructivo}
-        - Plantilla: ${plantilla}
-        - Resolución: ${resoCriterios}
-        - Marco PPO: ${proyectoPedagogico}
-        - Criterios de Calificación: ${planillaEvaluacion}
+        const prompt = `
+        Eres un experto pedagógico de la Dirección de Educación No Formal del GCABA. 
+        Tu tarea es evaluar el siguiente Proyecto Participativo Organizativo (PPO).
 
-        CONFIGURACIÓN DE INTENSIDAD REQUERIDA POR EL USUARIO:
-        - Claridad y Coherencia: ${body.c1}/10
-        - Viabilidad: ${body.c2}/10
-        - Adecuación Normativa: ${body.c3}/10
+        DOCUMENTOS DE REFERENCIA (Úsalos para comparar):
+        1. Instructivo: ${inst}
+        2. Planilla de Evaluación: ${plani}
+        3. Plantilla Oficial: ${planti}
+        4. Resolución Curricular: ${reso}
+        5. Marco Pedagógico: ${proy}
 
-        HISTORIAL Y MEJORAS PEDIDAS PREVIAMENTE:
-        ${antecedentesTexto}
+        PROYECTO A EVALUAR:
+        ${ppoUsuarioTexto}
 
-        PROYECTO ACTUAL A EVALUAR:
-        ${ppoActualTexto}
+        CRITERIOS DEL EVALUADOR (Escala 1-10):
+        - Claridad de Objetivos: ${body.c1}
+        - Viabilidad: ${body.c2}
+        - Marco Normativo: ${body.c3}
 
-        TAREA: 
-        Realiza una auditoría profunda. Usa los niveles de intensidad solicitados para ser más o menos estricto en cada apartado. 
-        Si hay antecedentes, verifica punto por punto si el centro corrigió lo que se le observó.
-
-        FORMATO DE INFORME:
-        1. PUNTAJE FINAL (0-100) según la Planilla de Evaluación.
-        2. RESUMEN EJECUTIVO.
-        3. ANÁLISIS DE MEJORA CONTINUA.
-        4. FORTALEZAS.
-        5. DEBILIDADES Y RECOMENDACIONES.
+        TAREA:
+        Genera un informe técnico estructurado en HTML. Incluye fortalezas, debilidades y sugerencias de mejora basadas estrictamente en la normativa comparada.
         `;
 
-        const result = await model.generateContent(promptFinal);
-        const responseText = result.response.text();
-
-        return { 
-            statusCode: 200, 
-            body: JSON.stringify({ mensaje: responseText }) 
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mensaje: response.text() })
         };
 
     } catch (error) {
-        return { 
-            statusCode: 500, 
-            body: JSON.stringify({ error: "Error en el motor: " + error.message }) 
+        console.error("Error en la función gemini:", error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: "Error interno del servidor", detalle: error.message })
         };
     }
 };
