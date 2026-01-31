@@ -29,10 +29,12 @@ async function extraerTexto(buffer, nombreArchivo) {
 
 async function leerArchivoFijo(nombre) {
     try {
-        const ruta = path.join(process.cwd(), "data", nombre);
+        // CORRECCIÓN CRÍTICA: Usamos path.resolve para rutas en Vercel
+        const ruta = path.resolve(process.cwd(), "data", nombre);
+        
         if (!fs.existsSync(ruta)) {
-            console.error(`Archivo de referencia no encontrado: ${ruta}`);
-            return "";
+            console.warn(`Archivo de referencia no encontrado: ${ruta}`);
+            return ""; // Devolvemos vacío para que no rompa el Promise.all
         }
         const buffer = fs.readFileSync(ruta);
         return await extraerTexto(buffer, nombre);
@@ -58,6 +60,7 @@ export default async function handler(req, res) {
         const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
         // CARGA DE LOS 5 DOCUMENTOS DE REFERENCIA
+        // Usamos Promise.all pero ahora no fallará si un archivo no existe
         const [instructivo, planilla, plantilla, resolucion, proyecto] = await Promise.all([
             leerArchivoFijo("instructivo.docx"),
             leerArchivoFijo("planilla.pdf"),
