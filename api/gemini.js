@@ -1,10 +1,9 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const mammoth = require("mammoth");
-const pdfParse = require("pdf-parse");
-const fs = require("fs");
-const path = require("path");
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import mammoth from "mammoth";
+import pdfParse from "pdf-parse";
+import fs from "fs";
+import path from "path";
 
-// Configuración del modelo
 const MODEL_NAME = "gemini-1.5-flash";
 
 async function extraerTexto(buffer, nombreArchivo) {
@@ -18,8 +17,8 @@ async function extraerTexto(buffer, nombreArchivo) {
             return data.text;
         } else if (extension === "rtf") {
             const textoRtf = buffer.toString('utf8');
-            // Limpieza básica de etiquetas RTF
-            return textoRtf.replace(/\\f[0-9x]|\\fs[0-9x]|\\f[0-9x]|\\par|\\tab|\\ldblquote|\\rdblquote|\\'e1|\\'e9|\\'ed|\\'f3|\\'fa|\\'f1|\\u[0-9]{4,5}\??/g, " ");
+            // Limpieza exhaustiva de etiquetas RTF para no ensuciar el análisis de la IA
+            return textoRtf.replace(/\\f[0-9x]|\\fs[0-9x]|\\par|\\tab|\\ldblquote|\\rdblquote|\\'e1|\\'e9|\\'ed|\\'f3|\\'fa|\\'f1|\\u[0-9]{4,5}\??/g, " ");
         }
         return buffer.toString('utf8');
     } catch (error) {
@@ -30,10 +29,9 @@ async function extraerTexto(buffer, nombreArchivo) {
 
 async function leerArchivoFijo(nombre) {
     try {
-        // Buscamos en la carpeta 'data' en la raíz del proyecto
         const ruta = path.join(process.cwd(), "data", nombre);
         if (!fs.existsSync(ruta)) {
-            console.error(`Archivo no encontrado: ${ruta}`);
+            console.error(`Archivo de referencia no encontrado: ${ruta}`);
             return "";
         }
         const buffer = fs.readFileSync(ruta);
@@ -44,19 +42,23 @@ async function leerArchivoFijo(nombre) {
     }
 }
 
-exports.handler = async (event) => {
-    // Vercel maneja los métodos en event.method o event.httpMethod
-    const method = event.httpMethod || event.method;
-    if (method !== "POST") {
-        return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
+export default async function handler(req, res) {
+    // Solo permitimos peticiones POST
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Method Not Allowed" });
     }
 
     try {
+        // Verificación de la API KEY
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error("La GEMINI_API_KEY no está configurada en Vercel.");
+        }
+
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-        // Carga de documentos de referencia (Nombres simplificados)
-        const [inst, plani, planti, reso, proy] = await Promise.all([
+        // CARGA DE LOS 5 DOCUMENTOS DE REFERENCIA
+        const [instructivo, planilla, plantilla, resolucion, proyecto] = await Promise.all([
             leerArchivoFijo("instructivo.docx"),
             leerArchivoFijo("planilla.pdf"),
             leerArchivoFijo("plantilla.docx"),
@@ -64,50 +66,64 @@ exports.handler = async (event) => {
             leerArchivoFijo("proyecto.rtf")
         ]);
 
-        const body = JSON.parse(event.body);
+        const body = req.body;
         if (!body.archivo) {
-            return { statusCode: 400, body: JSON.stringify({ error: "Falta el archivo PPO" }) };
+            return res.status(400).json({ error: "No se recibió el archivo del PPO para evaluar." });
         }
 
-        const ppoUsuarioTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
+        // Extracción del texto del PPO subido por el usuario
+        const ppoTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
+        
+        // Procesamiento de antecedentes si existen
+        let antTexto = "";
+        if (body.archivoAntBase64) {
+            antTexto = await extraerTexto(Buffer.from(body.archivoAntBase64, 'base64'), body.nombreAnt);
+        }
 
-        const prompt = `
-        Eres un experto pedagógico de la Dirección de Educación No Formal del GCABA. 
-        Tu tarea es evaluar el siguiente Proyecto Participativo Organizativo (PPO).
+        // EL PROMPT PEDAGÓGICO COMPLETO (Sin recortes)
+        const promptFinal = `
+        Eres un experto pedagógico de la Dirección de Educación No Formal del GCABA. Tu misión es realizar una evaluación técnica, crítica y constructiva del siguiente Proyecto Participativo Organizativo (PPO).
+        
+        DOCUMENTOS NORMATIVOS DE REFERENCIA (Úsalos para contrastar el PPO):
+        1. Instructivo de Criterios: ${instructivo}
+        2. Planilla de Evaluación: ${planilla}
+        3. Plantilla Oficial: ${plantilla}
+        4. Resolución de Criterios: ${resolucion}
+        5. Marco del Proyecto Pedagógico: ${proyecto}
 
-        DOCUMENTOS DE REFERENCIA (Úsalos para comparar):
-        1. Instructivo: ${inst}
-        2. Planilla de Evaluación: ${plani}
-        3. Plantilla Oficial: ${planti}
-        4. Resolución Curricular: ${reso}
-        5. Marco Pedagógico: ${proy}
+        CONTENIDO DEL PPO A EVALUAR:
+        ${ppoTexto}
 
-        PROYECTO A EVALUAR:
-        ${ppoUsuarioTexto}
+        ANTECEDENTES ADJUNTOS:
+        ${antTexto}
 
-        CRITERIOS DEL EVALUADOR (Escala 1-10):
+        VALORACIONES PREVIAS DEL EVALUADOR (Escala 1-10):
         - Claridad de Objetivos: ${body.c1}
         - Viabilidad: ${body.c2}
-        - Marco Normativo: ${body.c3}
+        - Encuadre Normativo: ${body.c3}
 
-        TAREA:
-        Genera un informe técnico estructurado en HTML. Incluye fortalezas, debilidades y sugerencias de mejora basadas estrictamente en la normativa comparada.
+        ESTRUCTURA DEL INFORME REQUERIDA (Generar en HTML):
+        <h3>1. Resumen Ejecutivo</h3><p>Análisis sucinto de la propuesta.</p>
+        <h3>2. Análisis de Coherencia Interna</h3><p>Relación entre objetivos, contenidos y actividades.</p>
+        <h3>3. Evaluación Normativa</h3><p>Cumplimiento de la Resolución y el Instructivo del GCABA.</p>
+        <h3>4. Cuadro de Fortalezas y Debilidades</h3><ul><li>Detalles técnicos...</li></ul>
+        <h3>5. Sugerencias de Mejora</h3><p>Recomendaciones pedagógicas concretas.</p>
+        <h3>6. Dictamen Final</h3><p>Conclusión basada en los criterios del evaluador.</p>
+
+        Usa un tono profesional, docente y preciso.
         `;
 
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(promptFinal);
         const response = await result.response;
-        
-        return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mensaje: response.text() })
-        };
+        const text = response.text();
+
+        return res.status(200).json({ mensaje: text });
 
     } catch (error) {
-        console.error("Error en la función gemini:", error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Error interno del servidor", detalle: error.message })
-        };
+        console.error("Error en el servidor:", error);
+        return res.status(500).json({ 
+            error: "Error interno en el procesamiento pedagógico", 
+            detalle: error.message 
+        });
     }
-};
+}

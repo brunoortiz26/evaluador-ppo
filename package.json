@@ -2,6 +2,7 @@
   "name": "proyecto-ppo",
   "version": "1.0.0",
   "description": "Asistente para Proyectos Pedagogicos Organizativos",
+  "type": "module",
   "main": "index.html",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
