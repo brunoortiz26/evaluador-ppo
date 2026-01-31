@@ -5,10 +5,10 @@
   "main": "index.html",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
-    "mammoth": "^1.6.0",
-    "pdf-parse": "^1.1.1",
     "fs": "0.0.1-security",
-    "path": "^0.12.7"
+    "mammoth": "^1.11.0",
+    "path": "^0.12.7",
+    "pdf-parse": "^1.1.4"
   },
   "engines": {
     "node": ">=18.0.0"
