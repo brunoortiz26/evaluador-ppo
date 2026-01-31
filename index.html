@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Evaluador de PPO con IA</title>
-    <link rel="stylesheet" href="style.css">
     <style>
-        /* Mantengo los estilos visuales que tenías en tu versión preferida */
         body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
         .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         header { text-align: center; margin-bottom: 30px; }
@@ -18,7 +16,7 @@
         input[type="range"] { width: 80%; }
         .val { font-weight: bold; color: #e67e22; margin-left: 10px; }
         .btn-evaluar { background-color: #27ae60; color: white; border: none; padding: 15px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
-        #resultado { margin-top: 20px; padding: 15px; border-radius: 8px; }
+        #resultado { margin-top: 20px; padding: 15px; border-radius: 8px; border: 1px solid #ddd; background: #fff; }
         .reporte h3 { color: #2c3e50; border-left: 4px solid #3498db; padding-left: 10px; }
     </style>
 </head>
@@ -26,46 +24,36 @@
     <div class="container">
         <header>
             <h1>Evaluador de PPO con IA</h1>
-            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO) de los centros de Educación No Formal del GCABA.</p>
+            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO) de Educación No Formal del GCABA.</p>
         </header>
-
         <div class="card">
             <div class="card-header"><h2>1. Cargar Documentos del PPO</h2></div>
-            <div class="upload-box">
-                <label>Archivo Principal (PDF, DOCX o RTF):</label>
-                <input type="file" id="archivoPrincipal" accept=".pdf,.docx,.rtf">
-            </div>
+            <label>Archivo Principal:</label>
+            <input type="file" id="archivoPrincipal" accept=".pdf,.docx,.rtf">
         </div>
-
         <div class="card">
             <div class="card-header"><h2>2. Configuración de la Evaluación</h2></div>
-            <div class="criterios">
-                <div class="criterio-item">
-                    <label>Claridad y Coherencia de Objetivos</label>
-                    <input type="range" min="1" max="10" value="5" id="criterio1" oninput="v1.innerText = this.value">
-                    <span id="v1" class="val">5</span>
-                </div>
-                <div class="criterio-item">
-                    <label>Viabilidad de las Actividades Propuestas</label>
-                    <input type="range" min="1" max="10" value="5" id="criterio2" oninput="v2.innerText = this.value">
-                    <span id="v2" class="val">5</span>
-                </div>
-                <div class="criterio-item">
-                    <label>Adecuación al Marco Normativo</label>
-                    <input type="range" min="1" max="10" value="5" id="criterio3" oninput="v3.innerText = this.value">
-                    <span id="v3" class="val">5</span>
-                </div>
+            <div class="criterio-item">
+                <label>Claridad y Coherencia de Objetivos</label>
+                <input type="range" min="1" max="10" value="5" id="criterio1" oninput="v1.innerText = this.value">
+                <span id="v1" class="val">5</span>
             </div>
-            <div class="antecedentes-area">
-                <label>Documentos de Referencia Específicos (Opcional):</label>
-                <input type="file" id="archivoAntecedentes" accept=".pdf,.docx,.rtf">
+            <div class="criterio-item">
+                <label>Viabilidad de las Actividades Propuestas</label>
+                <input type="range" min="1" max="10" value="5" id="criterio2" oninput="v2.innerText = this.value">
+                <span id="v2" class="val">5</span>
             </div>
+            <div class="criterio-item">
+                <label>Adecuación al Marco Normativo</label>
+                <input type="range" min="1" max="10" value="5" id="criterio3" oninput="v3.innerText = this.value">
+                <span id="v3" class="val">5</span>
+            </div>
+            <label>Antecedentes (Opcional):</label>
+            <input type="file" id="archivoAntecedentes" accept=".pdf,.docx,.rtf">
         </div>
-
         <button id="btnEvaluar" class="btn-evaluar">Evaluar PPO</button>
         <div id="resultado"></div>
     </div>
-
     <script>
         const toBase64 = file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -73,51 +61,30 @@
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         });
-
         document.getElementById('btnEvaluar').onclick = async () => {
             const fileInput = document.getElementById('archivoPrincipal');
             const antInput = document.getElementById('archivoAntecedentes');
             const resDiv = document.getElementById('resultado');
-
-            if (!fileInput.files[0]) return alert("Por favor, cargá el PPO principal.");
-
-            resDiv.innerHTML = "<p>⏳ Generando reporte experto... por favor esperá.</p>";
-
+            if (!fileInput.files[0]) return alert("Cargá el PPO.");
+            resDiv.innerHTML = "<p>⏳ Generando reporte experto...</p>";
             try {
                 const ppo64 = await toBase64(fileInput.files[0]);
                 let ant64 = null;
-                let antNombre = "";
-                if (antInput.files[0]) {
-                    ant64 = await toBase64(antInput.files[0]);
-                    antNombre = antInput.files[0].name;
-                }
-
+                if (antInput.files[0]) ant64 = await toBase64(antInput.files[0]);
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        archivo: ppo64,
-                        nombre: fileInput.files[0].name,
-                        archivoAntBase64: ant64,
-                        nombreAnt: antNombre,
+                        archivo: ppo64, nombre: fileInput.files[0].name,
+                        archivoAntBase64: ant64, nombreAnt: antInput.files[0]?.name || "",
                         c1: document.getElementById('criterio1').value,
                         c2: document.getElementById('criterio2').value,
                         c3: document.getElementById('criterio3').value
                     })
                 });
-
                 const data = await response.json();
-                
-                if (data.mensaje) {
-                    resDiv.innerHTML = `<div class="reporte">${data.mensaje}</div>`;
-                } else {
-                    resDiv.innerHTML = `<p style="color:red">Error: ${data.error || 'Respuesta inesperada'}</p>`;
-                }
-
-            } catch (err) {
-                resDiv.innerHTML = "<p style='color:red'>Error de conexión.</p>";
-                console.error(err);
-            }
+                resDiv.innerHTML = data.mensaje ? `<div class="reporte">${data.mensaje}</div>` : `<p style="color:red">${data.error}</p>`;
+            } catch (err) { resDiv.innerHTML = "Error de conexión."; }
         };
     </script>
 </body>

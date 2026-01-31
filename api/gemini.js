@@ -21,7 +21,6 @@ async function extraerTexto(buffer, nombreArchivo) {
         }
         return buffer.toString('utf8');
     } catch (error) {
-        console.error(`Error extrayendo texto de ${nombreArchivo}:`, error);
         return "";
     }
 }
@@ -29,14 +28,12 @@ async function extraerTexto(buffer, nombreArchivo) {
 async function leerArchivoFijo(nombre) {
     try {
         const ruta = path.join(process.cwd(), "data", nombre);
-        if (!fs.existsSync(ruta)) {
-            console.warn(`Archivo de referencia no encontrado: ${nombre}`);
-            return `(Referencia ${nombre} no disponible)`;
+        if (fs.existsSync(ruta)) {
+            const buffer = fs.readFileSync(ruta);
+            return await extraerTexto(buffer, nombre);
         }
-        const buffer = fs.readFileSync(ruta);
-        return await extraerTexto(buffer, nombre);
+        return `(Referencia ${nombre} no disponible)`;
     } catch (error) {
-        console.error(`Error al leer archivo fijo ${nombre}:`, error);
         return "";
     }
 }
@@ -45,9 +42,7 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
     try {
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error("GEMINI_API_KEY no configurada.");
-        }
+        if (!process.env.GEMINI_API_KEY) throw new Error("Falta API KEY");
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -60,41 +55,25 @@ export default async function handler(req, res) {
             leerArchivoFijo("proyecto.rtf")
         ]);
 
-        const body = req.body;
-        if (!body.archivo) return res.status(400).json({ error: "Falta el PPO." });
+        const { archivo, nombre, archivoAntBase64, nombreAnt, c1, c2, c3 } = req.body;
+        if (!archivo) return res.status(400).json({ error: "Falta archivo" });
 
-        const ppoTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
-        let antTexto = body.archivoAntBase64 ? await extraerTexto(Buffer.from(body.archivoAntBase64, 'base64'), body.nombreAnt) : "";
+        const ppoTexto = await extraerTexto(Buffer.from(archivo, 'base64'), nombre);
+        let antTexto = archivoAntBase64 ? await extraerTexto(Buffer.from(archivoAntBase64, 'base64'), nombreAnt) : "";
 
         const promptFinal = `
-        Eres un experto pedagógico de la Dirección de Educación No Formal del GCABA. Evalúa críticamente el PPO adjunto.
-        
-        DOCUMENTOS DE REFERENCIA NORMATIVA:
-        1. Instructivo: ${instructivo}
-        2. Planilla: ${planilla}
-        3. Plantilla: ${plantilla}
-        4. Resolución: ${resolucion}
-        5. Marco Pedagógico: ${proyecto}
-
-        PPO A EVALUAR:
-        ${ppoTexto}
-
-        ANTECEDENTES:
-        ${antTexto}
-
-        VALORACIÓN DEL EVALUADOR (1-10): 
-        Claridad=${body.c1}, Viabilidad=${body.c2}, Normativa=${body.c3}
-
-        TAREA: Genera un informe técnico detallado en HTML (h3, strong, ul, li).
-        Debe incluir: Resumen Ejecutivo, Análisis de Coherencia, Cumplimiento Normativo, Fortalezas/Debilidades, Sugerencias y Dictamen final.
+        Eres un experto pedagógico del GCABA. Evalúa el PPO adjunto.
+        REFERENCIAS: ${instructivo}, ${planilla}, ${plantilla}, ${resolucion}, ${proyecto}
+        CONTENIDO: ${ppoTexto}
+        ANTECEDENTES: ${antTexto}
+        NOTAS: Objetivos=${c1}, Viabilidad=${c2}, Normativa=${c3}
+        TAREA: Genera un informe detallado en HTML con: Resumen, Coherencia, Normativa, Fortalezas/Debilidades, Sugerencias y Dictamen.
         `;
 
         const result = await model.generateContent(promptFinal);
         const response = await result.response;
         return res.status(200).json({ mensaje: response.text() });
-
     } catch (error) {
-        console.error("Error detallado:", error);
         return res.status(500).json({ error: "Error interno en el procesamiento pedagógico", detalle: error.message });
     }
 }
