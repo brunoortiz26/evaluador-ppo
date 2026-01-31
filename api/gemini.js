@@ -4,49 +4,50 @@ const pdfParse = require("pdf-parse");
 const fs = require("fs");
 const path = require("path");
 
-// Función universal para extraer texto (soporta PDF y Word)
+// Función universal para extraer texto (PDF, Word, RTF/Texto)
 async function extraerTexto(buffer, nombre) {
-    if (nombre.toLowerCase().endsWith(".docx")) {
-        const res = await mammoth.extractRawText({ buffer });
-        return res.value;
-    } else {
-        const data = await pdfParse(buffer);
-        return data.text;
+    const ext = nombre.toLowerCase();
+    try {
+        if (ext.endsWith(".docx")) {
+            const res = await mammoth.extractRawText({ buffer });
+            return res.value;
+        } else if (ext.endsWith(".pdf")) {
+            const data = await pdfParse(buffer);
+            return data.text;
+        } else {
+            // Manejo para el archivo .rtf o texto plano
+            return buffer.toString('utf8').replace(/\\f[0-9x]|\\fs[0-9x]|\\f[0-9x]|\\par|\\tab/g, ""); 
+        }
+    } catch (e) {
+        return `Error leyendo ${nombre}: ${e.message}`;
     }
 }
 
-// Función para leer los archivos de la carpeta /data
+// Función para leer los archivos de la carpeta /data (Ajustado para Vercel)
 async function leerArchivoFijo(nombre) {
-    const ruta = path.join(__dirname, "../../data", nombre);
-    if (!fs.existsSync(ruta)) return `(Archivo ${nombre} no encontrado en /data)`;
+    // process.cwd() es la raíz en Vercel, permitiendo llegar a /data
+    const ruta = path.join(process.cwd(), "data", nombre);
+    if (!fs.existsSync(ruta)) return `(Archivo ${nombre} no encontrado)`;
     
     const buffer = fs.readFileSync(ruta);
-    if (nombre.toLowerCase().endsWith(".docx")) {
-        const res = await mammoth.extractRawText({ buffer });
-        return res.value;
-    } else {
-        const data = await pdfParse(buffer);
-        return data.text;
-    }
+    return await extraerTexto(buffer, nombre);
 }
 
 exports.handler = async (event) => {
-    if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
+    // Compatibilidad de métodos Vercel (POST)
+    const method = event.httpMethod || event.method;
+    if (method !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        
-        // CORRECCIÓN PARA EL 404: 
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash"
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // 1. CARGA DE LOS 5 DOCUMENTOS FIJOS
-        const instructivo = await leerArchivoFijo("Instructivo Proyecto Organizativo.pdf");
-        const plantilla = await leerArchivoFijo("Plantilla de PPO.pdf");
-        const resoCriterios = await leerArchivoFijo("Proyecto Organizativo (extracto de la Reso de criterios curriculares).pdf");
-        const proyectoPedagogico = await leerArchivoFijo("PROYECTO PEDAGÓGICO ORGANIZATIVO.docx");
+        // 1. CARGA DE LOS 5 DOCUMENTOS FIJOS (Nombres exactos según tu VS Code)
+        const instructivo = await leerArchivoFijo("Instructivo Proyecto Organizativo (extracto de la Reso de criterios curriculares).docx");
         const planillaEvaluacion = await leerArchivoFijo("Planilla modelo de evaluación.pdf");
+        const plantilla = await leerArchivoFijo("Plantilla de PPO.docx");
+        const resoCriterios = await leerArchivoFijo("Proyecto Organizativo (extracto de la Reso de criterios curriculares).docx");
+        const proyectoPedagogico = await leerArchivoFijo("PROYECTO PEDAGÓGICO ORGANIZATIVO.rtf");
 
         // 2. RECIBIR DATOS DEL INDEX
         const body = JSON.parse(event.body);
