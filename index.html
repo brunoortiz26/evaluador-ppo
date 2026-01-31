@@ -1,4 +1,4 @@
-<!D<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -61,7 +61,6 @@
 
             resDiv.innerHTML = "<p>⏳ Procesando documentos y generando reporte experto... por favor esperá.</p>";
 
-            // Función para convertir archivo a Base64
             const toBase64 = file => new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -80,7 +79,8 @@
                     nombreAnt = antInput.files[0].name;
                 }
 
-                const response = await fetch('/.netlify/functions/gemini', {
+                // DIRECCIÓN CORREGIDA PARA VERCEL
+                const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -108,9 +108,5 @@
             }
         };
     </script>
-</body>
-</html>
-</body>
-</html>
 </body>
 </html>
