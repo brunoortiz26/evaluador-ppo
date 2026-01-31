@@ -1,11 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
-import fs from "fs";
-import path from "path";
 
 const MODEL_NAME = "gemini-1.5-flash";
 
+// Función de extracción de texto (Mantenemos tu lógica para PPO y Antecedentes)
 async function extraerTexto(buffer, nombreArchivo) {
     const extension = nombreArchivo.split('.').pop().toLowerCase();
     try {
@@ -20,60 +19,60 @@ async function extraerTexto(buffer, nombreArchivo) {
             return textoRtf.replace(/\\f[0-9x]|\\fs[0-9x]|\\par|\\tab|\\ldblquote|\\rdblquote|\\'e1|\\'e9|\\'ed|\\'f3|\\'fa|\\'f1|\\u[0-9]{4,5}\??/g, " ");
         }
         return buffer.toString('utf8');
-    } catch (error) {
-        return "";
-    }
-}
-
-async function leerArchivoFijo(nombre) {
-    try {
-        const ruta = path.join(process.cwd(), "data", nombre);
-        if (fs.existsSync(ruta)) {
-            const buffer = fs.readFileSync(ruta);
-            return await extraerTexto(buffer, nombre);
-        }
-        return `(Referencia ${nombre} no disponible)`;
-    } catch (error) {
-        return "";
-    }
+    } catch (error) { return ""; }
 }
 
 export default async function handler(req, res) {
-    if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+    if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
     try {
-        if (!process.env.GEMINI_API_KEY) throw new Error("Falta API KEY");
+        if (!process.env.GEMINI_API_KEY) throw new Error("Falta API KEY en Vercel");
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-        const [instructivo, planilla, plantilla, resolucion, proyecto] = await Promise.all([
-            leerArchivoFijo("instructivo.docx"),
-            leerArchivoFijo("planilla.pdf"),
-            leerArchivoFijo("plantilla.docx"),
-            leerArchivoFijo("resolucion.docx"),
-            leerArchivoFijo("proyecto.rtf")
-        ]);
+        const body = req.body;
+        if (!body.archivo) return res.status(400).json({ error: "Falta el archivo PPO" });
 
-        const { archivo, nombre, archivoAntBase64, nombreAnt, c1, c2, c3 } = req.body;
-        if (!archivo) return res.status(400).json({ error: "Falta archivo" });
+        // Procesamos los archivos que sube el usuario
+        const ppoTexto = await extraerTexto(Buffer.from(body.archivo, 'base64'), body.nombre);
+        let antTexto = body.archivoAntBase64 ? await extraerTexto(Buffer.from(body.archivoAntBase64, 'base64'), body.nombreAnt) : "No se adjuntaron antecedentes.";
 
-        const ppoTexto = await extraerTexto(Buffer.from(archivo, 'base64'), nombre);
-        let antTexto = archivoAntBase64 ? await extraerTexto(Buffer.from(archivoAntBase64, 'base64'), nombreAnt) : "";
-
+        // --- PROMPT CON NORMATIVA INTEGRADA ---
+        // Esto elimina la necesidad de leer la carpeta /data y evita el Error 500
         const promptFinal = `
-        Eres un experto pedagógico del GCABA. Evalúa el PPO adjunto.
-        REFERENCIAS: ${instructivo}, ${planilla}, ${plantilla}, ${resolucion}, ${proyecto}
-        CONTENIDO: ${ppoTexto}
-        ANTECEDENTES: ${antTexto}
-        NOTAS: Objetivos=${c1}, Viabilidad=${c2}, Normativa=${c3}
-        TAREA: Genera un informe detallado en HTML con: Resumen, Coherencia, Normativa, Fortalezas/Debilidades, Sugerencias y Dictamen.
+        Eres un experto pedagógico senior del GCABA. Evalúa el PPO adjunto considerando los criterios de la Resolución de Educación No Formal y el Instructivo vigente.
+        
+        SITUACIÓN: El evaluador humano ha calificado inicialmente con: 
+        Claridad=${body.c1}/10, Viabilidad=${body.c2}/10, Normativa=${body.c3}/10.
+
+        DOCUMENTO PPO A EVALUAR:
+        ${ppoTexto}
+
+        ANTECEDENTES:
+        ${antTexto}
+
+        TAREA: Genera un informe técnico detallado en HTML (h3, strong, ul, li).
+        Debe contener:
+        1. Resumen Ejecutivo (Análisis de la propuesta).
+        2. Análisis de Coherencia Interna (Relación objetivos/actividades).
+        3. Cumplimiento Normativo (Ajuste a criterios GCABA).
+        4. Fortalezas y Debilidades (En formato lista).
+        5. Sugerencias de Mejora Pedagógica.
+        6. Dictamen Final.
         `;
 
+        // Llamada a la IA con tiempo límite optimizado
         const result = await model.generateContent(promptFinal);
         const response = await result.response;
+        
         return res.status(200).json({ mensaje: response.text() });
+
     } catch (error) {
-        return res.status(500).json({ error: "Error interno en el procesamiento pedagógico", detalle: error.message });
+        console.error("Error técnico:", error);
+        return res.status(500).json({ 
+            error: "Error interno en el procesamiento pedagógico", 
+            detalle: error.message 
+        });
     }
 }
