@@ -4,71 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Evaluador de PPO con IA</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; line-height: 1.6; color: #333; background-color: #f4f7f6; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        header { text-align: center; border-bottom: 2px solid #eee; margin-bottom: 30px; padding-bottom: 10px; }
-        h1 { color: #2c3e50; margin-bottom: 5px; }
-        .subtitle { color: #7f8c8d; font-style: italic; }
-        .card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        .card h2 { font-size: 1.2rem; color: #2980b9; margin-top: 0; }
-        .section { margin-bottom: 20px; }
-        label { display: block; font-weight: bold; margin-bottom: 8px; color: #34495e; }
-        input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #3498db; border-radius: 5px; background: #ebf5fb; }
+        /* Mantengo los estilos visuales que tenías en tu versión preferida */
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        header { text-align: center; margin-bottom: 30px; }
+        .subtitle { color: #666; font-style: italic; }
+        .card { border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .card-header h2 { font-size: 1.2rem; color: #2980b9; margin-top: 0; }
         .criterio-item { margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 6px; }
-        input[type="range"] { width: 80%; vertical-align: middle; }
-        .val { font-weight: bold; color: #e67e22; font-size: 1.1rem; margin-left: 10px; }
-        button { background-color: #27ae60; color: white; border: none; padding: 15px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; transition: background 0.3s; }
-        button:hover { background-color: #219150; }
-        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-        #resultado { margin-top: 30px; padding: 20px; border: 1px solid #dcdde1; border-radius: 8px; background: #fff; min-height: 150px; }
-        .loading { text-align: center; color: #2980b9; font-weight: bold; }
-        /* Estilos para el reporte generado */
-        .reporte h3 { color: #2c3e50; border-left: 4px solid #3498db; padding-left: 10px; margin-top: 20px; }
-        .reporte ul { padding-left: 20px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        input[type="range"] { width: 80%; }
+        .val { font-weight: bold; color: #e67e22; margin-left: 10px; }
+        .btn-evaluar { background-color: #27ae60; color: white; border: none; padding: 15px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
+        #resultado { margin-top: 20px; padding: 15px; border-radius: 8px; }
+        .reporte h3 { color: #2c3e50; border-left: 4px solid #3498db; padding-left: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Evaluador de PPO con IA</h1>
-            <p class="subtitle">Dirección de Educación No Formal - GCABA</p>
+            <p class="subtitle">Herramienta para la evaluación del Proyecto Participativo Organizativo (PPO) de los centros de Educación No Formal del GCABA.</p>
         </header>
 
         <div class="card">
-            <h2>1. Documentación del Proyecto</h2>
-            <div class="section">
-                <label>Archivo Principal del PPO (DOCX, PDF o RTF):</label>
-                <input type="file" id="archivoPrincipal" accept=".docx,.pdf,.rtf">
-            </div>
-            <div class="section">
-                <label>Antecedentes o Referencias (Opcional):</label>
-                <input type="file" id="archivoAntecedentes" accept=".docx,.pdf,.rtf">
+            <div class="card-header"><h2>1. Cargar Documentos del PPO</h2></div>
+            <div class="upload-box">
+                <label>Archivo Principal (PDF, DOCX o RTF):</label>
+                <input type="file" id="archivoPrincipal" accept=".pdf,.docx,.rtf">
             </div>
         </div>
 
         <div class="card">
-            <h2>2. Configuración de la Evaluación</h2>
-            <div class="criterio-item">
-                <label>Claridad y Coherencia de Objetivos</label>
-                <input type="range" id="c1" min="1" max="10" value="5" oninput="v1.innerText = this.value">
-                <span id="v1" class="val">5</span>
+            <div class="card-header"><h2>2. Configuración de la Evaluación</h2></div>
+            <div class="criterios">
+                <div class="criterio-item">
+                    <label>Claridad y Coherencia de Objetivos</label>
+                    <input type="range" min="1" max="10" value="5" id="criterio1" oninput="v1.innerText = this.value">
+                    <span id="v1" class="val">5</span>
+                </div>
+                <div class="criterio-item">
+                    <label>Viabilidad de las Actividades Propuestas</label>
+                    <input type="range" min="1" max="10" value="5" id="criterio2" oninput="v2.innerText = this.value">
+                    <span id="v2" class="val">5</span>
+                </div>
+                <div class="criterio-item">
+                    <label>Adecuación al Marco Normativo</label>
+                    <input type="range" min="1" max="10" value="5" id="criterio3" oninput="v3.innerText = this.value">
+                    <span id="v3" class="val">5</span>
+                </div>
             </div>
-            <div class="criterio-item">
-                <label>Viabilidad de las Actividades</label>
-                <input type="range" id="c2" min="1" max="10" value="5" oninput="v2.innerText = this.value">
-                <span id="v2" class="val">5</span>
-            </div>
-            <div class="criterio-item">
-                <label>Adecuación al Marco Normativo</label>
-                <input type="range" id="c3" min="1" max="10" value="5" oninput="v3.innerText = this.value">
-                <span id="v3" class="val">5</span>
+            <div class="antecedentes-area">
+                <label>Documentos de Referencia Específicos (Opcional):</label>
+                <input type="file" id="archivoAntecedentes" accept=".pdf,.docx,.rtf">
             </div>
         </div>
 
-        <button id="btnEvaluar">Generar Informe Pedagógico</button>
-
-        <div id="resultado">El informe se mostrará aquí...</div>
+        <button id="btnEvaluar" class="btn-evaluar">Evaluar PPO</button>
+        <div id="resultado"></div>
     </div>
 
     <script>
@@ -83,20 +78,17 @@
             const fileInput = document.getElementById('archivoPrincipal');
             const antInput = document.getElementById('archivoAntecedentes');
             const resDiv = document.getElementById('resultado');
-            const btn = document.getElementById('btnEvaluar');
 
-            if (!fileInput.files[0]) return alert("Por favor, selecciona el archivo del PPO.");
+            if (!fileInput.files[0]) return alert("Por favor, cargá el PPO principal.");
 
-            btn.disabled = true;
-            resDiv.innerHTML = '<p class="loading">⏳ Analizando normativa y coherencia pedagógica... Esto puede demorar un minuto.</p>';
+            resDiv.innerHTML = "<p>⏳ Generando reporte experto... por favor esperá.</p>";
 
             try {
-                const ppoBase64 = await toBase64(fileInput.files[0]);
-                let antBase64 = null;
+                const ppo64 = await toBase64(fileInput.files[0]);
+                let ant64 = null;
                 let antNombre = "";
-                
                 if (antInput.files[0]) {
-                    antBase64 = await toBase64(antInput.files[0]);
+                    ant64 = await toBase64(antInput.files[0]);
                     antNombre = antInput.files[0].name;
                 }
 
@@ -104,31 +96,27 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        archivo: ppoBase64,
+                        archivo: ppo64,
                         nombre: fileInput.files[0].name,
-                        archivoAntBase64: antBase64,
+                        archivoAntBase64: ant64,
                         nombreAnt: antNombre,
-                        c1: document.getElementById('c1').value,
-                        c2: document.getElementById('c2').value,
-                        c3: document.getElementById('c3').value
+                        c1: document.getElementById('criterio1').value,
+                        c2: document.getElementById('criterio2').value,
+                        c3: document.getElementById('criterio3').value
                     })
                 });
 
                 const data = await response.json();
-
+                
                 if (data.mensaje) {
-                    // Limpiamos posibles formatos de Markdown que a veces Gemini devuelve
-                    let htmlFinal = data.mensaje.replace(/```html/g, '').replace(/```/g, '');
-                    resDiv.innerHTML = `<div class="reporte">${htmlFinal}</div>`;
+                    resDiv.innerHTML = `<div class="reporte">${data.mensaje}</div>`;
                 } else {
-                    resDiv.innerHTML = `<p style="color:red">Error: ${data.error || 'No se recibió el informe'}</p>`;
+                    resDiv.innerHTML = `<p style="color:red">Error: ${data.error || 'Respuesta inesperada'}</p>`;
                 }
 
             } catch (err) {
-                resDiv.innerHTML = "<p style='color:red'>Error de comunicación con el servidor.</p>";
+                resDiv.innerHTML = "<p style='color:red'>Error de conexión.</p>";
                 console.error(err);
-            } finally {
-                btn.disabled = false;
             }
         };
     </script>
